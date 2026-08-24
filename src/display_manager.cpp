@@ -31,7 +31,11 @@ namespace display_mgr {
 
   void begin() {
     display.init(115200);
-    display.setRotation(1);
+    // Rotation follows the device mounting (1 = right-hand, 3 = left).
+    display.setRotation(config::DISPLAY_ROTATION);
+    Serial.printf("[display] rotation %d (%s-hand device)\n",
+                  config::DISPLAY_ROTATION,
+                  config::DISPLAY_ROTATION == 3 ? "left" : "right");
     display.setTextColor(GxEPD_BLACK);
     // Do NOT clearScreen() here — the panel retains its previous image
     // across deep sleep, and clearing on every wake would cause a flash.
@@ -284,9 +288,13 @@ namespace display_mgr {
 
       // -- Subtitle: tracked 14pt (caps 17 tall / yOffset -16 → baseline
       // 64 puts the ink at y=48..64, clear of the wordmark above and the
-      // separator below).
+      // separator below). Carries the hand marker (L/R) so a desk full
+      // of devices can be told apart at a glance on cold boot.
+      char sub[24];
+      snprintf(sub, sizeof(sub), "MQTT DASHBOARD %s",
+               config::DISPLAY_ROTATION == 3 ? "L" : "R");
       display.setFont(&DSDIGI14pt7b);
-      drawTrackedCentered("MQTT DASHBOARD", display.width() / 2, 64, 3,
+      drawTrackedCentered(sub, display.width() / 2, 64, 3,
                           display.width() - 10);
 
       display.drawLine(0, 70, display.width(), 70, GxEPD_BLACK);

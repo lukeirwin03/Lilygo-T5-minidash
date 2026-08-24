@@ -31,7 +31,7 @@ jobs:
         run: cp include/secrets.example.h include/secrets.h
 
       - name: Build firmware
-        run: pio run -e esp32dev
+        run: pio run -e esp32dev -e esp32dev_left -e esp32dev_weather -e esp32dev_weather_left -e esp32dev_test -e esp32dev_test_left
 
       - name: Native unit tests
         run: pio test -e native

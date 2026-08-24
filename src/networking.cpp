@@ -217,6 +217,19 @@ bool connectMqtt() {
   }
   mqtt.setKeepAlive(30);
 
+  // Unique client ID per device: two desk devices waking in the same
+  // window would otherwise evict each other's MQTT session (brokers
+  // force-disconnect the older connection when a client ID collides).
+  // Base name from config + 16 bits from the efuse MAC's upper half —
+  // on the classic ESP32 getEfuseMac() returns the OUI (vendor bytes,
+  // identical across all Espressif chips) in the LOW 24 bits and the
+  // device-specific NIC suffix up high, so bits 47:32 (the last two MAC
+  // bytes) differ per device.
+  static char clientId[32];
+  uint64_t mac = ESP.getEfuseMac();
+  snprintf(clientId, sizeof(clientId), "%s-%04X",
+           config::MQTT_CLIENT_ID, (uint16_t)(mac >> 32));
+
   const unsigned long start = millis();
   int n = 0;
   while (!mqtt.connected()) {
@@ -227,11 +240,11 @@ bool connectMqtt() {
     }
 
     Serial.printf("[mqtt] Connecting to %s:%d as %s...\n",
-                  config::MQTT_HOST, config::MQTT_PORT, config::MQTT_CLIENT_ID);
+                  config::MQTT_HOST, config::MQTT_PORT, clientId);
 
     bool ok = config::MQTT_USER
-      ? mqtt.connect(config::MQTT_CLIENT_ID, config::MQTT_USER, config::MQTT_PASS)
-      : mqtt.connect(config::MQTT_CLIENT_ID);
+      ? mqtt.connect(clientId, config::MQTT_USER, config::MQTT_PASS)
+      : mqtt.connect(clientId);
 
     if (ok) {
       Serial.println("[mqtt] Connected");

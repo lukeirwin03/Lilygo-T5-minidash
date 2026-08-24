@@ -2,6 +2,15 @@
 #include <cstdint>
 #include "secrets.h"
 
+// -- Device orientation --
+// Desk-HUD devices come in two mountings: right-hand (default — image in
+// normal landscape, setRotation(1)) and left-hand (device physically
+// flipped 180° on the desk, image rotated to match, setRotation(3)).
+// Selected per-env via platformio.ini build_flags, not by editing here.
+#ifndef HAND_ROTATION
+#define HAND_ROTATION 1
+#endif
+
 namespace config {
   // -- WiFi -- (credentials in secrets.h)
   constexpr const char* WIFI_SSID     = secrets::WIFI_SSID;
@@ -16,6 +25,9 @@ namespace config {
 
   // -- Display behavior --
   constexpr unsigned long FULL_REFRESH_EVERY = 50;
+  // Panel rotation follows the device mounting; see the orientation block
+  // above the namespace.
+  constexpr int DISPLAY_ROTATION = HAND_ROTATION;   // 1 = right-hand, 3 = left-hand
 
   // -- Power / deep sleep --
   // Wake at the top of each hour (HH:00:00). The MQTT publisher emits
