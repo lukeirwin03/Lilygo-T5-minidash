@@ -8,16 +8,46 @@
 #include "networking.h"
 #include "power_mgr.h"
 #include "dashboards/weather_dashboard.h"
+#include "dashboards/test_dashboard.h"
+
+// -- Dashboard set -------------------------------------------------------
+// Which dashboards this firmware carries — baked at build time via
+// platformio.ini envs (selected by ./flash.sh --dash) so each desk device
+// gets its designated dashboard(s). Defaults are 1 (everything), which is
+// the plain `pio run -e esp32dev` behavior; single-dash envs zero the
+// others out. Add a new dashboard: guard it with its own ENABLE_ flag
+// here, add envs in platformio.ini, and list it in flash.sh's --dash.
+#ifndef ENABLE_WEATHER
+#define ENABLE_WEATHER 1
+#endif
+#ifndef ENABLE_TEST
+#define ENABLE_TEST 1
+#endif
 
 // -- Dashboards ---------------------------------------------------------------
-// Two views of the same MQTT topic. Now is always the default on a scheduled
-// wake; the user can short-press to flip to Forecast (button-wake path).
+// Weather Now + Forecast (two views of the same MQTT topic) plus a static
+// test pattern for the flashtool. The first entry is the scheduled-wake
+// default. Button cycling depends on the flashed set: all → Now →
+// Forecast → Test Pattern; weather-only → Now ↔ Forecast; test-only → a
+// single static screen.
+#if ENABLE_WEATHER
 static WeatherDashboard weatherNowDash(WeatherDashboard::MODE_NOW);
 static WeatherDashboard weatherForecastDash(WeatherDashboard::MODE_FORECAST);
+#endif
+#if ENABLE_TEST
+static TestDashboard testDash;
+#endif
 
 // These are picked up via extern by display_manager and networking.
 // `extern` here forces external linkage that `const` would otherwise hide.
-extern Dashboard* const dashboards[] = { &weatherNowDash, &weatherForecastDash };
+extern Dashboard* const dashboards[] = {
+#if ENABLE_WEATHER
+  &weatherNowDash, &weatherForecastDash,
+#endif
+#if ENABLE_TEST
+  &testDash,
+#endif
+};
 extern const size_t NUM_DASHBOARDS = sizeof(dashboards) / sizeof(dashboards[0]);
 
 // -- Hardware -----------------------------------------------------------------
@@ -97,9 +127,10 @@ static void handleScheduledWake(bool isColdBoot) {
   // WiFi/MQTT, and the retained payload is already in RTC RAM.
   networking::logHealth();
   networking::shutdown();
-  // Scheduled wakes always reset to the Now view (the 15:5 ratio idea is
-  // expressed by Now being the default and the user pressing the button to
-  // see Forecast on demand).
+  // Scheduled wakes always reset to the FIRST registered dashboard —
+  // Now when weather is compiled in, otherwise whatever single dash this
+  // device carries (the 15:5 ratio idea is expressed by Now being the
+  // default and the user pressing the button to see others on demand).
   display_mgr::switchTo(0);
 }
 
@@ -155,6 +186,10 @@ void setup() {
 
   display_mgr::begin();
   btnNav.begin();
+
+  Serial.printf("[main] Dashboard set:%s%s\n",
+                ENABLE_WEATHER ? " weather(now,forecast)" : "",
+                ENABLE_TEST ? " test" : "");
 
   // Sample the battery before WiFi comes up — radio TX droops the rails
   // ~50–100 mV, which would understate the indicator. Reading is cached
